@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { supabase, hasSupabaseConfig, handleSupabaseOAuthRedirect } from './src/lib/supabase';
+import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
 import AuthLoadingScreen from './src/screens/AuthLoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import CreateAccountScreen from './src/screens/CreateAccountScreen';
@@ -99,6 +100,21 @@ export default function App() {
       }
     });
 
+    // Also listen for Firebase auth changes so Firebase-authenticated users
+    // cause the navigator to re-evaluate which stacks to render.
+    let firebaseUnsubscribe;
+    try {
+      const firebaseAuth = getAuth();
+      firebaseUnsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+        if (isMounted) {
+          setSession(user ?? null);
+          setInitializing(false);
+        }
+      });
+    } catch (err) {
+      console.warn('Firebase auth listener could not be attached:', err);
+    }
+
     const deepLinkListener = Linking.addEventListener('url', ({ url }) => {
       restoreSessionFromDeepLink(url);
     });
@@ -106,6 +122,13 @@ export default function App() {
     return () => {
       isMounted = false;
       authListener?.subscription?.unsubscribe?.();
+      if (typeof firebaseUnsubscribe === 'function') {
+        try {
+          firebaseUnsubscribe();
+        } catch (e) {
+          // ignore
+        }
+      }
       deepLinkListener?.remove?.();
     };
   }, []);
