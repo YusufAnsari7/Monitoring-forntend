@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { colors } from '../theme';
 import ProfileAvatar from './ProfileAvatar';
 
@@ -16,6 +17,18 @@ const navItems = [
 
 export default function SideDrawer({ visible, onClose, active, onNavigate }) {
   const slideAnim = React.useRef(new Animated.Value(300)).current;
+  const [profileName, setProfileName] = useState('User');
+
+  useEffect(() => {
+    const auth = getAuth();
+    const syncProfile = (user) => {
+      setProfileName(user?.displayName || user?.email || 'User');
+    };
+
+    syncProfile(auth.currentUser);
+    const unsubscribe = onAuthStateChanged(auth, syncProfile);
+    return () => unsubscribe();
+  }, []);
 
   React.useEffect(() => {
     Animated.timing(slideAnim, {
@@ -74,7 +87,7 @@ export default function SideDrawer({ visible, onClose, active, onNavigate }) {
           <View style={styles.profileRow}>
             <ProfileAvatar size={34} />
             <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={styles.profileName}>Michael Jordan</Text>
+              <Text style={styles.profileName}>{profileName}</Text>
               <Text style={styles.profileMeta}>Ops · Local Cluster</Text>
             </View>
           </View>

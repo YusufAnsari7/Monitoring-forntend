@@ -14,22 +14,26 @@
 //
 //   iOS simulator: "http://localhost:3001" works fine.
 
-export const API_BASE_URL = 'http://10.0.2.2:3001';
+// Import the functions you need from the SDKs you need
+import { initializeApp } from 'firebase/app';
+import { getAnalytics } from 'firebase/analytics';
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-// How often the Alerts screen auto-refreshes, in milliseconds.
-export const ALERTS_POLL_INTERVAL_MS = 15000;
+export const API_BASE_URL = 'https://playful-parasail-unworthy.ngrok-free.dev';
 
-// Supabase configuration.
-// Live project credentials for the monitoring app.
-export const SUPABASE_URL = 'https://zavxpxkxllxvxjpzuxej.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_4RqZu6LXr23ufZzwjoNT7A_VsW4-6RN';
-export const APP_REDIRECT_SCHEME = 'monitoringdashboard';
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyCTb3y2l5I7RqEdthIeBT9n_EH7BXl9VlU',
+  authDomain: 'monitoringdashboard-ad9f0.firebaseapp.com',
+  projectId: 'monitoringdashboard-ad9f0',
+  storageBucket: 'monitoringdashboard-ad9f0.firebasestorage.app',
+  messagingSenderId: '345553288323',
+  appId: '1:345553288323:web:1e70de396caf550ce0afb6',
+  measurementId: 'G-HBZ9V64JZF',
+};
 
-// Placeholder values kept separately so the "is this configured" check
-// doesn't compare live credentials against themselves.
-const PLACEHOLDER_SUPABASE_URL = 'https://your-project.supabase.co';
-const PLACEHOLDER_SUPABASE_ANON_KEY = 'your-anon-key';
-
-export const IS_SUPABASE_CONFIGURED =
-  SUPABASE_URL !== PLACEHOLDER_SUPABASE_URL &&
-  SUPABASE_ANON_KEY !== PLACEHOLDER_SUPABASE_ANON_KEY;
+// Initialize Firebase exactly once before any auth calls
+export const firebaseApp = initializeApp(FIREBASE_CONFIG);
+export const analytics = getAnalytics(firebaseApp);

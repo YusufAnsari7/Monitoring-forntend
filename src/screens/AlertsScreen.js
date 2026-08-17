@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import BottomNavigation from '../components/BottomNavigation';
 import SideDrawer from '../components/SideDrawer';
-import { alertFeed } from '../mock/mockData';
+import { fetchAlerts } from '../api/client';
 import { colors } from '../theme';
 
 const filters = ['All', 'Firing', 'Resolved'];
@@ -14,6 +14,35 @@ export default function AlertsScreen({ navigation }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
   const [severityFilter, setSeverityFilter] = useState('All');
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAlerts = async () => {
+      setLoading(true);
+      try {
+        const params = {
+          status: statusFilter === 'All' ? undefined : statusFilter.toLowerCase(),
+          severity: severityFilter === 'All' ? undefined : severityFilter.toLowerCase(),
+        };
+        const response = await fetchAlerts(params);
+        if (!isMounted) return;
+        setAlerts(response?.alerts ?? []);
+      } catch (error) {
+        if (!isMounted) return;
+        setAlerts([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadAlerts();
+    return () => {
+      isMounted = false;
+    };
+  }, [statusFilter, severityFilter]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -51,23 +80,37 @@ export default function AlertsScreen({ navigation }) {
             </View>
           </View>
 
-          {alertFeed.map((alert) => (
-            <View key={alert.id} style={styles.alertCard}>
-              <View style={styles.cardHeader}>
-                <View style={[styles.severityMark, { backgroundColor: alert.severity === 'critical' ? colors.red : alert.severity === 'warning' ? colors.amber : colors.blue }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.alertTitle}>{alert.title}</Text>
-                  <Text style={styles.alertSource}>{alert.source}</Text>
-                </View>
-                <Text style={[styles.severityLabel, { color: alert.severity === 'critical' ? colors.red : alert.severity === 'warning' ? colors.amber : colors.blue }]}>
-                  {alert.severity.toUpperCase()}
-                </Text>
-              </View>
-
-              <Text style={styles.alertMessage}>{alert.message}</Text>
-              <Text style={styles.time}>{alert.time}</Text>
+          {loading ? (
+            <View style={styles.loaderWrap}>
+              <ActivityIndicator size="small" color={colors.blue} />
             </View>
-          ))}
+          ) : alerts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No alerts</Text>
+              <Text style={styles.emptyText}>Your monitored services are currently healthy.</Text>
+            </View>
+          ) : (
+            alerts.map((alert) => {
+              const severity = (alert.severity || 'info').toLowerCase();
+              const color = severity === 'critical' ? colors.red : severity === 'warning' ? colors.amber : colors.blue;
+
+              return (
+                <View key={alert.id || `${alert.name}-${alert.receivedAt}`} style={styles.alertCard}>
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.severityMark, { backgroundColor: color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.alertTitle}>{alert.name || alert.summary || 'Alert'}</Text>
+                      <Text style={styles.alertSource}>{alert.job || alert.instance || alert.source || 'System'}</Text>
+                    </View>
+                    <Text style={[styles.severityLabel, { color }]}>{(severity || 'INFO').toUpperCase()}</Text>
+                  </View>
+
+                  <Text style={styles.alertMessage}>{alert.summary || alert.description || alert.message || 'No description provided.'}</Text>
+                  <Text style={styles.time}>{alert.receivedAt ? new Date(alert.receivedAt).toLocaleString() : alert.startsAt || 'Just now'}</Text>
+                </View>
+              );
+            })
+          )}
         </ScrollView>
 
         <BottomNavigation active="Alerts" onNavigate={(screen) => navigation.navigate(screen)} />
@@ -124,4 +167,15 @@ const styles = StyleSheet.create({
   severityLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   alertMessage: { color: colors.textSoft, lineHeight: 20, fontSize: 14 },
   time: { color: colors.textMuted, fontSize: 11, marginTop: 10 },
+  loaderWrap: { paddingVertical: 24, alignItems: 'center' },
+  emptyState: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    marginTop: 8,
+  },
+  emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  emptyText: { color: colors.textMuted, marginTop: 6, lineHeight: 20 },
 });

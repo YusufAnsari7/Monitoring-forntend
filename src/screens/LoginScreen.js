@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { colors } from '../theme';
-import { formatAuthError, signInWithEmail, signInWithGoogle } from '../lib/supabase';
+import { formatFirebaseAuthError, signInWithEmail, signInWithGoogle } from '../lib/firebaseAuth';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -37,7 +37,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Login failed', formatAuthError(error));
+      Alert.alert('Login failed', formatFirebaseAuthError(error));
       return;
     }
   };
@@ -48,7 +48,7 @@ export default function LoginScreen({ navigation }) {
     setGoogleLoading(false);
 
     if (error) {
-      Alert.alert('Google sign-in failed', formatAuthError(error));
+      Alert.alert('Google sign-in failed', formatFirebaseAuthError(error));
     }
   };
 

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, Alert, Linking } from 'react-native';
+import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { supabase, hasSupabaseConfig, handleSupabaseOAuthRedirect } from './src/lib/supabase';
+import { onAuthStateChangedListener } from './src/lib/firebaseAuth';
 import AuthLoadingScreen from './src/screens/AuthLoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import CreateAccountScreen from './src/screens/CreateAccountScreen';
@@ -27,86 +27,15 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    const restoreSessionFromDeepLink = async (url) => {
-      if (!url) {
-        return;
-      }
-
-      try {
-        const { data, error } = await handleSupabaseOAuthRedirect(url);
-        if (!isMounted) {
-          return;
-        }
-
-        if (error) {
-          console.warn('Supabase callback handling failed:', error.message || error);
-          return;
-        }
-
-        if (data?.session) {
-          setSession(data.session);
-        }
-      } catch (error) {
-        console.warn('Supabase OAuth callback error:', error);
-      }
-    };
-
-    const bootstrapSession = async () => {
-      if (!hasSupabaseConfig()) {
-        setSession(null);
-        setInitializing(false);
-        return;
-      }
-
-      try {
-        const initialUrl = await Linking.getInitialURL();
-        if (initialUrl) {
-          await restoreSessionFromDeepLink(initialUrl);
-        }
-
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        if (!isMounted) {
-          return;
-        }
-
-        if (error) {
-          console.warn('Session initialization error:', error.message || 'Unable to load your session.');
-        }
-
-        setSession(currentSession ?? null);
-      } catch (error) {
-        console.warn('Session bootstrap failed:', error);
-        setSession(null);
-      } finally {
-        if (isMounted) {
-          setInitializing(false);
-        }
-      }
-    };
-
-    bootstrapSession();
-
-    if (!hasSupabaseConfig()) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (isMounted) {
-        setSession(nextSession ?? null);
-        setInitializing(false);
-      }
-    });
-
-    const deepLinkListener = Linking.addEventListener('url', ({ url }) => {
-      restoreSessionFromDeepLink(url);
+    const unsubscribe = onAuthStateChangedListener((user) => {
+      if (!isMounted) return;
+      setSession(user ?? null);
+      setInitializing(false);
     });
 
     return () => {
       isMounted = false;
-      authListener?.subscription?.unsubscribe?.();
-      deepLinkListener?.remove?.();
+      unsubscribe();
     };
   }, []);
 

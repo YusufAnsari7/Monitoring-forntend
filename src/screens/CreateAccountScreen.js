@@ -10,15 +10,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { colors } from '../theme';
-import { formatAuthError, sendOtpForEmail, verifyOtpCode } from '../lib/supabase';
+import { formatFirebaseAuthError, signUpWithEmail } from '../lib/firebaseAuth';
 
 export default function CreateAccountScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const validateFields = () => {
@@ -56,71 +54,26 @@ export default function CreateAccountScreen({ navigation }) {
     }
 
     setLoading(true);
-    setOtpSent(false);
     try {
-      const { data, error } = await sendOtpForEmail({
+      const { error } = await signUpWithEmail({
         email: fields.trimmedEmail,
+        password,
         fullName: fields.trimmedName,
       });
 
       if (error) {
-        const message = error.message || '';
-        const friendlyText = message.toLowerCase().includes('disabled') || message.toLowerCase().includes('provider')
-          ? 'Email authentication is not enabled in your Supabase project. Turn on Email in Authentication → Providers and confirm the redirect URL is monitoringdashboard://auth/callback.'
-          : formatAuthError(error);
-
-        Alert.alert('OTP request failed', friendlyText);
-        return;
-      }
-
-      if (!data) {
-        Alert.alert('No OTP sent', 'Supabase did not return an OTP response. Check the project URL, anon key, and Email provider configuration.');
-        return;
-      }
-
-      setOtpSent(true);
-      Alert.alert(
-        'Your 10-minute OTP code is on the way',
-        'We sent a one-time verification code to your email. Enter it below to complete setup.',
-      );
-    } catch (error) {
-      Alert.alert('Account setup failed', 'Something unexpected happened while sending the OTP. Please check your Supabase Email provider and project settings.');
-      console.warn('Create account OTP error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    const trimmedEmail = email.trim();
-    const trimmedCode = otpCode.trim();
-
-    if (!trimmedEmail || !trimmedCode) {
-      Alert.alert('OTP required', 'Enter the 6-digit code sent to your email.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await verifyOtpCode({
-        email: trimmedEmail,
-        token: trimmedCode,
-        fullName: fullName.trim(),
-      });
-
-      if (error) {
-        Alert.alert('Verification failed', formatAuthError(error));
+        Alert.alert('Signup failed', formatFirebaseAuthError(error));
         return;
       }
 
       Alert.alert(
-        'Welcome aboard',
-        'Your account is verified and ready. Thank you for choosing our app.',
+        'Account created',
+        'A verification email was sent. Please verify your email, then sign in.',
         [{ text: 'Continue', onPress: () => navigation.navigate('Login') }],
       );
-    } catch (error) {
-      Alert.alert('Verification error', 'The OTP could not be verified. Please check the code and try again.');
-      console.warn('OTP verification error:', error);
+    } catch (err) {
+      Alert.alert('Signup error', 'Unable to create account. Please try again.');
+      console.warn('Signup error:', err);
     } finally {
       setLoading(false);
     }
@@ -174,36 +127,13 @@ export default function CreateAccountScreen({ navigation }) {
           style={styles.input}
         />
 
-        {!otpSent ? (
-          <Pressable
-            disabled={loading}
-            onPress={handleCreateAccount}
-            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Send OTP</Text>}
-          </Pressable>
-        ) : (
-          <>
-            <Text style={styles.label}>Verification code</Text>
-            <TextInput
-              value={otpCode}
-              onChangeText={setOtpCode}
-              placeholder="Enter 6-digit code"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              maxLength={6}
-              style={styles.input}
-            />
-
-            <Pressable
-              disabled={loading}
-              onPress={handleVerifyOtp}
-              style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-            >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Verify OTP</Text>}
-            </Pressable>
-          </>
-        )}
+        <Pressable
+          disabled={loading}
+          onPress={handleCreateAccount}
+          style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Create account</Text>}
+        </Pressable>
 
         <Pressable onPress={() => navigation.goBack()} style={styles.secondaryLink}>
           <Text style={styles.secondaryLinkText}>Back to login</Text>

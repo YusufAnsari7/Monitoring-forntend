@@ -1,28 +1,22 @@
-import { supabase } from './supabase';
+import { getAuth } from 'firebase/auth';
 
 export async function fetchCurrentProfile() {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-  if (userError || !user) {
-    return { user: null, profile: null, error: userError || new Error('No user signed in.') };
-  }
-
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (error && error.code !== 'PGRST116') {
-    return { user, profile: null, error };
+  if (!user) {
+    return { user: null, profile: null, error: new Error('No user signed in.') };
   }
 
   return {
     user,
-    profile: profile || null,
+    profile: {
+      full_name: user.displayName || 'User',
+      name: user.displayName || 'User',
+      email: user.email || 'No email available',
+      avatar_url: user.photoURL || null,
+      id: user.uid || 'N/A',
+    },
     error: null,
   };
 }
@@ -31,14 +25,13 @@ export function getDisplayProfile(user, profile) {
   const fullName =
     profile?.full_name ||
     profile?.name ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
+    user?.displayName ||
     'User';
 
   return {
     fullName,
     email: user?.email || profile?.email || 'No email available',
-    avatarUrl: profile?.avatar_url || user?.user_metadata?.avatar_url || null,
-    userId: user?.id || profile?.id || 'N/A',
+    avatarUrl: profile?.avatar_url || user?.photoURL || null,
+    userId: user?.uid || profile?.id || 'N/A',
   };
 }

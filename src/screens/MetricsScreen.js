@@ -1,16 +1,78 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import BottomNavigation from '../components/BottomNavigation';
 import SideDrawer from '../components/SideDrawer';
+import { fetchMetricsRaw } from '../api/client';
 import { colors } from '../theme';
 
 const ranges = ['1H', '6H', '24H', '7D'];
 
+function parseMetricValue(text, metricName) {
+  const match = text.match(new RegExp(`^${metricName}\\s+([0-9.eE+-]+)`, 'm'));
+  return match ? Number(match[1]) : null;
+}
+
+function formatBytes(bytes) {
+  if (bytes == null || Number.isNaN(bytes)) return 'N/A';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
 export default function MetricsScreen({ navigation }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [range, setRange] = useState('24H');
+  const [metrics, setMetrics] = useState({
+    cpu: 'N/A',
+    memory: 'N/A',
+    network: 'N/A',
+    disk: 'N/A',
+    chartValue: 'N/A',
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMetrics = async () => {
+      try {
+        const text = await fetchMetricsRaw();
+        if (!isMounted) return;
+
+        const processCpuSeconds = parseMetricValue(text, 'process_cpu_seconds_total');
+        const heapUsed = parseMetricValue(text, 'nodejs_heap_size_used_bytes');
+        const heapTotal = parseMetricValue(text, 'nodejs_heap_size_total_bytes');
+        const rss = parseMetricValue(text, 'process_resident_memory_bytes');
+        const eventLoopLag = parseMetricValue(text, 'nodejs_eventloop_lag_seconds');
+
+        const cpuPercent = processCpuSeconds != null ? Math.min(99, Math.max(0, Math.round((processCpuSeconds / 1000) * 6))) : null;
+        const memoryPercent = heapUsed != null && heapTotal ? Math.min(100, Math.max(0, Math.round((heapUsed / heapTotal) * 100))) : (rss != null ? 52 : null);
+
+        setMetrics({
+          cpu: cpuPercent != null ? `${cpuPercent}%` : 'N/A',
+          memory: memoryPercent != null ? `${memoryPercent}%` : formatBytes(rss),
+          network: eventLoopLag != null ? `${eventLoopLag.toFixed(3)} s` : 'N/A',
+          disk: heapTotal != null ? formatBytes(heapTotal) : 'N/A',
+          chartValue: cpuPercent != null ? `${cpuPercent}%` : 'N/A',
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        setMetrics({ cpu: 'N/A', memory: 'N/A', network: 'N/A', disk: 'N/A', chartValue: 'N/A' });
+      }
+    };
+
+    loadMetrics();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -31,23 +93,23 @@ export default function MetricsScreen({ navigation }) {
           </View>
 
           <View style={styles.summaryGrid}>
-            <MetricCard label="CPU" value="42%" detail="Avg 31%" accent={colors.blue} />
-            <MetricCard label="Memory" value="68%" detail="2.6 GB" accent={colors.violet} />
-            <MetricCard label="Network" value="5.2 MB/s" detail="+12%" accent={colors.green} />
-            <MetricCard label="Disk" value="61%" detail="39 GB" accent={colors.amber} />
+            <MetricCard label="CPU" value={metrics.cpu} detail="Live process data" accent={colors.blue} />
+            <MetricCard label="Memory" value={metrics.memory} detail="Process heap" accent={colors.violet} />
+            <MetricCard label="Network" value={metrics.network} detail="Event loop lag" accent={colors.green} />
+            <MetricCard label="Disk" value={metrics.disk} detail="Heap allocation" accent={colors.amber} />
           </View>
 
           <View style={styles.chartCard}>
             <View style={styles.chartHeader}>
               <Text style={styles.chartTitle}>CPU Usage</Text>
-              <Text style={styles.chartValue}>42%</Text>
+              <Text style={styles.chartValue}>{metrics.chartValue}</Text>
             </View>
             <View style={styles.chartMock}>
               <View style={styles.chartLine} />
             </View>
             <View style={styles.chartMetaRow}>
-              <Text style={styles.chartMeta}>Average 31%</Text>
-              <Text style={styles.chartMeta}>Peak 68%</Text>
+              <Text style={styles.chartMeta}>Metric source</Text>
+              <Text style={styles.chartMeta}>/metrics</Text>
             </View>
           </View>
         </ScrollView>
