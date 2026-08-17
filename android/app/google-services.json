@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "345553288323",
+    "project_id": "monitoringdashboard-ad9f0",
+    "storage_bucket": "monitoringdashboard-ad9f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345553288323:android:1f9aac723ae0610de0afb6",
+        "android_client_info": {
+          "package_name": "com.monitoringdashboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClJLr90PJHegR7h-E8sRaBsgthMrRRnKc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

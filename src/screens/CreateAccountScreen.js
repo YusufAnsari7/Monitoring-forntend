@@ -9,131 +9,216 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from '@react-native-firebase/auth';
 import { colors } from '../theme';
-import { formatAuthError, sendOtpForEmail, verifyOtpCode } from '../lib/supabase';
 
 export default function CreateAccountScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const validateFields = () => {
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim();
 
     if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
-      Alert.alert('Missing details', 'Please complete every field before creating your account.');
+      Alert.alert(
+        'Missing details',
+        'Please complete every field before creating your account.',
+      );
       return null;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Password mismatch', 'The password and confirm password fields must match.');
+      Alert.alert(
+        'Password mismatch',
+        'The password and confirm password fields must match.',
+      );
       return null;
     }
 
     if (password.length < 8) {
-      Alert.alert('Weak password', 'Use at least 8 characters for a stronger password.');
+      Alert.alert(
+        'Weak password',
+        'Use at least 8 characters for a stronger password.',
+      );
       return null;
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!emailPattern.test(trimmedEmail)) {
-      Alert.alert('Invalid email', 'Please enter a valid email address.');
+      Alert.alert(
+        'Invalid email',
+        'Please enter a valid email address.',
+      );
       return null;
     }
 
-    return { trimmedName, trimmedEmail };
+    return {
+      trimmedName,
+      trimmedEmail,
+    };
   };
 
   const handleCreateAccount = async () => {
     const fields = validateFields();
+
     if (!fields) {
       return;
     }
 
     setLoading(true);
-    setOtpSent(false);
+
     try {
-      const { data, error } = await sendOtpForEmail({
-        email: fields.trimmedEmail,
-        fullName: fields.trimmedName,
-      });
+      const auth = getAuth();
 
-      if (error) {
-        const message = error.message || '';
-        const friendlyText = message.toLowerCase().includes('disabled') || message.toLowerCase().includes('provider')
-          ? 'Email authentication is not enabled in your Supabase project. Turn on Email in Authentication → Providers and confirm the redirect URL is monitoringdashboard://auth/callback.'
-          : formatAuthError(error);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        fields.trimmedEmail,
+        password,
+      );
 
-        Alert.alert('OTP request failed', friendlyText);
-        return;
-      }
+      const user = userCredential.user;
 
-      if (!data) {
-        Alert.alert('No OTP sent', 'Supabase did not return an OTP response. Check the project URL, anon key, and Email provider configuration.');
-        return;
-      }
+      await sendEmailVerification(user);
 
-      setOtpSent(true);
+      setVerificationSent(true);
+
       Alert.alert(
-        'Your 10-minute OTP code is on the way',
-        'We sent a one-time verification code to your email. Enter it below to complete setup.',
+        'Check your email',
+        `We sent a verification link to ${fields.trimmedEmail}. Please open your email and click the verification link.`,
       );
     } catch (error) {
-      Alert.alert('Account setup failed', 'Something unexpected happened while sending the OTP. Please check your Supabase Email provider and project settings.');
-      console.warn('Create account OTP error:', error);
+      console.log('Firebase registration error:', error);
+
+      let message = 'Unable to create your account. Please try again.';
+
+      if (error?.code === 'auth/email-already-in-use') {
+        message = 'An account with this email already exists.';
+      } else if (error?.code === 'auth/invalid-email') {
+        message = 'Please enter a valid email address.';
+      } else if (error?.code === 'auth/weak-password') {
+        message = 'Your password is too weak.';
+      } else if (error?.code === 'auth/network-request-failed') {
+        message = 'Network error. Please check your internet connection.';
+      }
+
+      Alert.alert('Account creation failed', message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async () => {
-    const trimmedEmail = email.trim();
-    const trimmedCode = otpCode.trim();
-
-    if (!trimmedEmail || !trimmedCode) {
-      Alert.alert('OTP required', 'Enter the 6-digit code sent to your email.');
-      return;
-    }
-
-    setLoading(true);
+  const handleResendVerification = async () => {
     try {
-      const { error } = await verifyOtpCode({
-        email: trimmedEmail,
-        token: trimmedCode,
-        fullName: fullName.trim(),
-      });
+      const auth = getAuth();
+      const user = auth.currentUser;
 
-      if (error) {
-        Alert.alert('Verification failed', formatAuthError(error));
+      if (!user) {
+        Alert.alert(
+          'Session expired',
+          'Please create your account again.',
+        );
         return;
       }
 
+      await sendEmailVerification(user);
+
       Alert.alert(
-        'Welcome aboard',
-        'Your account is verified and ready. Thank you for choosing our app.',
-        [{ text: 'Continue', onPress: () => navigation.navigate('Login') }],
+        'Email sent',
+        'A new verification email has been sent to your email address.',
       );
     } catch (error) {
-      Alert.alert('Verification error', 'The OTP could not be verified. Please check the code and try again.');
-      console.warn('OTP verification error:', error);
-    } finally {
-      setLoading(false);
+      console.log('Resend verification error:', error);
+
+      Alert.alert(
+        'Could not send email',
+        'Please wait a moment and try again.',
+      );
     }
   };
+
+  const handleGoToLogin = () => {
+    navigation.navigate('Login');
+  };
+
+  if (verificationSent) {
+    return (
+      <ScrollView
+        style={styles.page}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.eyebrow}>Almost there</Text>
+
+        <Text style={styles.title}>Verify your email</Text>
+
+        <Text style={styles.subtitle}>
+          We've sent a verification link to:
+        </Text>
+
+        <Text style={styles.emailText}>
+          {email.trim()}
+        </Text>
+
+        <View style={styles.formCard}>
+          <Text style={styles.verificationText}>
+            Open your email inbox and click the verification link from
+            Firebase.
+          </Text>
+
+          <Text style={styles.verificationText}>
+            After verifying your email, return to the app and log in.
+          </Text>
+
+          <Pressable
+            onPress={handleResendVerification}
+            style={styles.primaryButton}
+          >
+            <Text style={styles.primaryButtonText}>
+              Resend verification email
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleGoToLogin}
+            style={styles.secondaryLink}
+          >
+            <Text style={styles.secondaryLinkText}>
+              Go to login
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.page}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.eyebrow}>Create account</Text>
+
       <Text style={styles.title}>Start monitoring</Text>
-      <Text style={styles.subtitle}>Welcome to a smarter way to track Docker health, performance, and alerts.</Text>
+
+      <Text style={styles.subtitle}>
+        Welcome to a smarter way to track Docker health, performance,
+        and alerts.
+      </Text>
 
       <View style={styles.formCard}>
         <Text style={styles.label}>Full name</Text>
+
         <TextInput
           value={fullName}
           onChangeText={setFullName}
@@ -143,6 +228,7 @@ export default function CreateAccountScreen({ navigation }) {
         />
 
         <Text style={styles.label}>Email</Text>
+
         <TextInput
           value={email}
           onChangeText={setEmail}
@@ -155,6 +241,7 @@ export default function CreateAccountScreen({ navigation }) {
         />
 
         <Text style={styles.label}>Password</Text>
+
         <TextInput
           value={password}
           onChangeText={setPassword}
@@ -165,6 +252,7 @@ export default function CreateAccountScreen({ navigation }) {
         />
 
         <Text style={styles.label}>Confirm password</Text>
+
         <TextInput
           value={confirmPassword}
           onChangeText={setConfirmPassword}
@@ -174,39 +262,30 @@ export default function CreateAccountScreen({ navigation }) {
           style={styles.input}
         />
 
-        {!otpSent ? (
-          <Pressable
-            disabled={loading}
-            onPress={handleCreateAccount}
-            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Send OTP</Text>}
-          </Pressable>
-        ) : (
-          <>
-            <Text style={styles.label}>Verification code</Text>
-            <TextInput
-              value={otpCode}
-              onChangeText={setOtpCode}
-              placeholder="Enter 6-digit code"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              maxLength={6}
-              style={styles.input}
-            />
+        <Pressable
+          disabled={loading}
+          onPress={handleCreateAccount}
+          style={[
+            styles.primaryButton,
+            loading && styles.primaryButtonDisabled,
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>
+              Create account
+            </Text>
+          )}
+        </Pressable>
 
-            <Pressable
-              disabled={loading}
-              onPress={handleVerifyOtp}
-              style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-            >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Verify OTP</Text>}
-            </Pressable>
-          </>
-        )}
-
-        <Pressable onPress={() => navigation.goBack()} style={styles.secondaryLink}>
-          <Text style={styles.secondaryLinkText}>Back to login</Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.secondaryLink}
+        >
+          <Text style={styles.secondaryLinkText}>
+            Back to login
+          </Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -218,12 +297,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+
   content: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 32,
   },
+
   eyebrow: {
     color: colors.blue,
     fontSize: 12,
@@ -232,18 +313,28 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
   },
+
   title: {
     color: colors.text,
     fontSize: 32,
     fontWeight: '700',
     letterSpacing: -0.7,
   },
+
   subtitle: {
     color: colors.textMuted,
     fontSize: 14,
     marginTop: 8,
+    marginBottom: 12,
+  },
+
+  emailText: {
+    color: colors.blue,
+    fontSize: 15,
+    fontWeight: '700',
     marginBottom: 24,
   },
+
   formCard: {
     backgroundColor: colors.surface,
     borderRadius: 22,
@@ -251,12 +342,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 20,
   },
+
   label: {
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 8,
   },
+
   input: {
     backgroundColor: '#0D1524',
     borderWidth: 1,
@@ -268,6 +361,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 16,
   },
+
   primaryButton: {
     backgroundColor: colors.blueStrong,
     paddingVertical: 14,
@@ -275,21 +369,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+
   primaryButtonDisabled: {
     opacity: 0.7,
   },
+
   primaryButtonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
   },
+
   secondaryLink: {
     alignItems: 'center',
     marginTop: 16,
   },
+
   secondaryLinkText: {
     color: colors.blue,
     fontWeight: '700',
     fontSize: 15,
+  },
+
+  verificationText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 16,
   },
 });
