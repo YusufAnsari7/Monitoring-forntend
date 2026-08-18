@@ -14,22 +14,27 @@
 //
 //   iOS simulator: "http://localhost:3001" works fine.
 
-export const API_BASE_URL = 'http://10.0.2.2:3001';
+// Import the functions you need from the SDKs you need
+// Centralized API endpoints
+export const API_ENDPOINTS = {
+  home: 'https://playful-parasail-unworthy.ngrok-free.dev/',
+  metrics: 'https://playful-parasail-unworthy.ngrok-free.dev/metrics',
+  alerts: 'https://playful-parasail-unworthy.ngrok-free.dev/api/alerts',
+  alertStats: 'https://playful-parasail-unworthy.ngrok-free.dev/api/alerts/stats',
+  targets: 'https://playful-parasail-unworthy.ngrok-free.dev/api/metrics/targets',
+};
 
-// How often the Alerts screen auto-refreshes, in milliseconds.
-export const ALERTS_POLL_INTERVAL_MS = 15000;
+// Convenience base used by internal API clients (no trailing slash)
+export const API_BASE_URL = API_ENDPOINTS.home.replace(/\/+$/,'');
 
-// Supabase configuration.
-// Live project credentials for the monitoring app.
-export const SUPABASE_URL = 'https://zavxpxkxllxvxjpzuxej.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_4RqZu6LXr23ufZzwjoNT7A_VsW4-6RN';
-export const APP_REDIRECT_SCHEME = 'monitoringdashboard';
-
-// Placeholder values kept separately so the "is this configured" check
-// doesn't compare live credentials against themselves.
-const PLACEHOLDER_SUPABASE_URL = 'https://your-project.supabase.co';
-const PLACEHOLDER_SUPABASE_ANON_KEY = 'your-anon-key';
-
-export const IS_SUPABASE_CONFIGURED =
-  SUPABASE_URL !== PLACEHOLDER_SUPABASE_URL &&
-  SUPABASE_ANON_KEY !== PLACEHOLDER_SUPABASE_ANON_KEY;
+// Your web app's Firebase configuration (initialization is handled
+// in src/lib/firebaseAuth.js and is environment-aware)
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyCTb3y2l5I7RqEdthIeBT9n_EH7BXl9VlU',
+  authDomain: 'monitoringdashboard-ad9f0.firebaseapp.com',
+  projectId: 'monitoringdashboard-ad9f0',
+  storageBucket: 'monitoringdashboard-ad9f0.firebasestorage.app',
+  messagingSenderId: '345553288323',
+  appId: '1:345553288323:web:1e70de396caf550ce0afb6',
+  measurementId: 'G-HBZ9V64JZF',
+};

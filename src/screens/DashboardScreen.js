@@ -1,15 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import PrimaryButton from '../components/PrimaryButton';
 import BottomNavigation from '../components/BottomNavigation';
 import SideDrawer from '../components/SideDrawer';
-import { colors, radii, spacing } from '../theme';
-import { dashboardSummary } from '../mock/mockData';
+import { fetchAlertStats } from '../api/client';
+import { colors, radii } from '../theme';
+
+const defaultSummary = { totalContainers: 0, running: 0, stopped: 0, alerts: 0 };
 
 export default function DashboardScreen({ navigation }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [summary, setSummary] = useState(defaultSummary);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSummary = async () => {
+      try {
+        const stats = await fetchAlertStats();
+        if (!isMounted) return;
+
+        setSummary({
+          totalContainers: Number(stats?.total ?? 0),
+          running: Number(stats?.firing ?? 0),
+          stopped: Number(stats?.resolved ?? 0),
+          alerts: Number(stats?.total ?? 0),
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        setSummary(defaultSummary);
+      }
+    };
+
+    loadSummary();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -51,16 +80,16 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.summarySection}>
             <Text style={styles.sectionLabel}>Overview</Text>
             <View style={styles.summaryGrid}>
-              <MetricTile label="Containers" value={String(dashboardSummary.totalContainers)} tone="blue" />
-              <MetricTile label="Running" value={String(dashboardSummary.running)} tone="green" />
-              <MetricTile label="Stopped" value={String(dashboardSummary.stopped)} tone="amber" />
-              <MetricTile label="Alerts" value={String(dashboardSummary.alerts)} tone="red" />
+              <MetricTile label="Containers" value={String(summary.totalContainers)} tone="blue" />
+              <MetricTile label="Running" value={String(summary.running)} tone="green" />
+              <MetricTile label="Stopped" value={String(summary.stopped)} tone="amber" />
+              <MetricTile label="Alerts" value={String(summary.alerts)} tone="red" />
             </View>
           </View>
 
           <View style={styles.quickLinks}>
             <QuickAction title="Real-time Metrics" subtitle="CPU · Memory · Network" onPress={() => navigation.navigate('Metrics')} />
-            <QuickAction title="Active Alerts" subtitle="2 issues need attention" onPress={() => navigation.navigate('Alerts')} />
+            <QuickAction title="Active Alerts" subtitle={`${summary.alerts} issue${summary.alerts === 1 ? '' : 's'} reported`} onPress={() => navigation.navigate('Alerts')} />
           </View>
         </ScrollView>
 

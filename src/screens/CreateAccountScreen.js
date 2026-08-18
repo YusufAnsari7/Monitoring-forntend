@@ -9,12 +9,9 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  sendEmailVerification,
-} from '@react-native-firebase/auth';
+import { signUpWithEmail, sendEmailVerificationToCurrent } from '../lib/firebaseAuth';
 import { colors } from '../theme';
+import { formatFirebaseAuthError } from '../lib/firebaseAuth';
 
 export default function CreateAccountScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
@@ -78,40 +75,13 @@ export default function CreateAccountScreen({ navigation }) {
     setLoading(true);
 
     try {
-      const auth = getAuth();
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        fields.trimmedEmail,
-        password,
-      );
-
-      const user = userCredential.user;
-
-      await sendEmailVerification(user);
-
+      const { data, error } = await signUpWithEmail({ email: fields.trimmedEmail, password });
+      if (error) throw error;
       setVerificationSent(true);
-
-      Alert.alert(
-        'Check your email',
-        `We sent a verification link to ${fields.trimmedEmail}. Please open your email and click the verification link.`,
-      );
+      Alert.alert('Check your email', `We sent a verification link to ${fields.trimmedEmail}. Please open your email and click the verification link.`);
     } catch (error) {
-      console.log('Firebase registration error:', error);
-
-      let message = 'Unable to create your account. Please try again.';
-
-      if (error?.code === 'auth/email-already-in-use') {
-        message = 'An account with this email already exists.';
-      } else if (error?.code === 'auth/invalid-email') {
-        message = 'Please enter a valid email address.';
-      } else if (error?.code === 'auth/weak-password') {
-        message = 'Your password is too weak.';
-      } else if (error?.code === 'auth/network-request-failed') {
-        message = 'Network error. Please check your internet connection.';
-      }
-
-      Alert.alert('Account creation failed', message);
+      console.warn('Firebase registration error:', error);
+      Alert.alert('Account creation failed', formatFirebaseAuthError(error));
     } finally {
       setLoading(false);
     }
@@ -119,30 +89,12 @@ export default function CreateAccountScreen({ navigation }) {
 
   const handleResendVerification = async () => {
     try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-
-      if (!user) {
-        Alert.alert(
-          'Session expired',
-          'Please create your account again.',
-        );
-        return;
-      }
-
-      await sendEmailVerification(user);
-
-      Alert.alert(
-        'Email sent',
-        'A new verification email has been sent to your email address.',
-      );
+      const { error } = await sendEmailVerificationToCurrent();
+      if (error) throw error;
+      Alert.alert('Email sent', 'A new verification email has been sent to your email address.');
     } catch (error) {
-      console.log('Resend verification error:', error);
-
-      Alert.alert(
-        'Could not send email',
-        'Please wait a moment and try again.',
-      );
+      console.warn('Resend verification error:', error);
+      Alert.alert('Could not send email', 'Please wait a moment and try again.');
     }
   };
 
@@ -262,30 +214,12 @@ export default function CreateAccountScreen({ navigation }) {
           style={styles.input}
         />
 
-        <Pressable
-          disabled={loading}
-          onPress={handleCreateAccount}
-          style={[
-            styles.primaryButton,
-            loading && styles.primaryButtonDisabled,
-          ]}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>
-              Create account
-            </Text>
-          )}
+        <Pressable disabled={loading} onPress={handleCreateAccount} style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Create account</Text>}
         </Pressable>
 
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.secondaryLink}
-        >
-          <Text style={styles.secondaryLinkText}>
-            Back to login
-          </Text>
+        <Pressable onPress={() => navigation.goBack()} style={styles.secondaryLink}>
+          <Text style={styles.secondaryLinkText}>Back to login</Text>
         </Pressable>
       </View>
     </ScrollView>

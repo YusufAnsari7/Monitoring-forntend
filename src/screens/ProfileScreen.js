@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import ProfileAvatar from '../components/ProfileAvatar';
-import { supabase, formatAuthError } from '../lib/supabase';
 import { fetchCurrentProfile, getDisplayProfile } from '../lib/userProfile';
+import { formatFirebaseAuthError, signOut } from '../lib/firebaseAuth';
 
 export default function ProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function ProfileScreen({ navigation }) {
       }
 
       if (error) {
-        Alert.alert('Profile unavailable', formatAuthError(error));
+        Alert.alert('Profile unavailable', formatFirebaseAuthError(error));
       }
 
       const display = getDisplayProfile(user, profile);
@@ -41,13 +41,11 @@ export default function ProfileScreen({ navigation }) {
   }, []);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await signOut();
     if (error) {
-      Alert.alert('Logout failed', formatAuthError(error));
+      Alert.alert('Logout failed', formatFirebaseAuthError(error));
       return;
     }
-
-    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
 
   return (
